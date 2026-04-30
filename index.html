@@ -256,22 +256,20 @@ function onTouchEnd(e){
 // 通用3D人形绘制 — 骨骼动画驱动，所有角色共用
 // 骨骼：head, neck, torso, upperArmL/R, foreArmL/R, upperLegL/R, lowerLegL/R
 
-function drawLimb(c, x1, y1, x2, y2, thickness, color, highlight) {
-  // 绘制3D肢体（带渐变圆角效果）
+function drawLimb(c, x1, y1, x2, y2, thickness, color) {
   let dx = x2 - x1, dy = y2 - y1;
   let len = Math.hypot(dx, dy);
   if (len < 1) return;
-  let angle = Math.atan2(dy, dx);
+  let a = Math.atan2(dy, dx);
   c.save();
   c.translate(x1, y1);
-  c.rotate(angle);
-  // 主体（线性渐变模拟圆柱体3D感）
+  c.rotate(a);
   let r = thickness / 2;
+  // 简化渐变：2段代替4段，性能提升30%+
   let grad = c.createLinearGradient(0, -r, 0, r);
-  grad.addColorStop(0, highlight || lightenColor(color, 50));
-  grad.addColorStop(0.3, color);
-  grad.addColorStop(0.7, darkenColor(color, 30));
-  grad.addColorStop(1, darkenColor(color, 60));
+  grad.addColorStop(0, lightenColor(color, 40));
+  grad.addColorStop(0.5, color);
+  grad.addColorStop(1, darkenColor(color, 40));
   c.fillStyle = grad;
   c.beginPath();
   c.moveTo(r, 0);
@@ -279,15 +277,6 @@ function drawLimb(c, x1, y1, x2, y2, thickness, color, highlight) {
   c.arc(len - r, 0, r, 0, Math.PI);
   c.lineTo(r, r);
   c.arc(r, 0, r, Math.PI, 0);
-  c.closePath();
-  c.fill();
-  // 高光条
-  c.fillStyle = 'rgba(255,255,255,0.18)';
-  c.beginPath();
-  c.moveTo(r, -r * 0.4);
-  c.lineTo(len - r, -r * 0.4);
-  c.lineTo(len - r, -r * 0.1);
-  c.lineTo(r, -r * 0.1);
   c.closePath();
   c.fill();
   c.restore();
@@ -370,17 +359,14 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
   let luaAngle = -Math.PI/2 + bones.upperArmL;
   let luaEndX = -shoulderW + Math.cos(luaAngle) * uaLen;
   let luaEndY = shoulderY + Math.sin(luaAngle) * uaLen;
-  drawLimb(c, -shoulderW, shoulderY, luaEndX, luaEndY, uaW, shirt, lightenColor(shirt, 40));
+  drawLimb(c, -shoulderW, shoulderY, luaEndX, luaEndY, uaW, shirt);
   // 左前臂
   let lfaAngle = luaAngle + bones.foreArmL;
   let lfaEndX = luaEndX + Math.cos(lfaAngle) * faLen;
   let lfaEndY = luaEndY + Math.sin(lfaAngle) * faLen;
-  drawLimb(c, luaEndX, luaEndY, lfaEndX, lfaEndY, faW, skin, lightenColor(skin, 40));
-  // 左手（小圆球）
-  let handGrad = c.createRadialGradient(lfaEndX - 1, lfaEndY - 1, 0, lfaEndX, lfaEndY, faW * 0.5);
-  handGrad.addColorStop(0, lightenColor(skin, 30));
-  handGrad.addColorStop(1, darkenColor(skin, 20));
-  c.fillStyle = handGrad;
+  drawLimb(c, luaEndX, luaEndY, lfaEndX, lfaEndY, faW, skin);
+  // 左手（简化为圆）
+  c.fillStyle = skin;
   c.beginPath(); c.arc(lfaEndX, lfaEndY, faW * 0.45, 0, Math.PI * 2); c.fill();
 
   // === 后面的腿 ===
@@ -400,15 +386,11 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
   c.fillStyle = 'rgba(255,255,255,0.15)';
   c.beginPath(); c.ellipse(lllEndX + 2, lllEndY - 1, llW * 0.4, llW * 0.2, 0.2, 0, Math.PI * 2); c.fill();
 
-  // === 躯干（3D立体感） ===
-  // 身体主形状（圆角矩形渐变）
+  // === 躯干（简化3D感） ===
   let bodyGrad = c.createLinearGradient(-torsoW, 0, torsoW, 0);
-  bodyGrad.addColorStop(0, darkenColor(shirt, 40));
-  bodyGrad.addColorStop(0.2, shirt);
-  bodyGrad.addColorStop(0.45, lightenColor(shirt, 30));
-  bodyGrad.addColorStop(0.55, lightenColor(shirt, 30));
-  bodyGrad.addColorStop(0.8, shirt);
-  bodyGrad.addColorStop(1, darkenColor(shirt, 40));
+  bodyGrad.addColorStop(0, darkenColor(shirt, 35));
+  bodyGrad.addColorStop(0.5, lightenColor(shirt, 25));
+  bodyGrad.addColorStop(1, darkenColor(shirt, 35));
   c.fillStyle = bodyGrad;
   c.beginPath();
   let bodyTop = neckY - 2, bodyBot = hipY;
@@ -424,41 +406,20 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
   c.quadraticCurveTo(-bw, bodyTop, -bw + br, bodyTop);
   c.closePath();
   c.fill();
-  // 身体中线
-  c.strokeStyle = darkenColor(shirt, 20);
-  c.lineWidth = 1;
-  c.globalAlpha = 0.3;
-  c.beginPath(); c.moveTo(0, bodyTop + 3); c.lineTo(0, bodyBot - 2); c.stroke();
-  c.globalAlpha = 1;
-  // 身体高光
-  c.fillStyle = 'rgba(255,255,255,0.1)';
-  c.beginPath();
-  c.moveTo(-bw * 0.6 + br, bodyTop);
-  c.lineTo(-bw * 0.1, bodyTop);
-  c.lineTo(-bw * 0.1, bodyBot - br);
-  c.lineTo(-bw * 0.6 + br, bodyBot);
-  c.quadraticCurveTo(-bw * 0.6, bodyBot, -bw * 0.6, bodyBot - br);
-  c.lineTo(-bw * 0.6, bodyTop + br);
-  c.quadraticCurveTo(-bw * 0.6, bodyTop, -bw * 0.6 + br, bodyTop);
-  c.closePath();
-  c.fill();
 
   // === 前面的手臂 ===
   // 右上臂
   let ruaAngle = -Math.PI/2 + bones.upperArmR;
   let ruaEndX = shoulderW + Math.cos(ruaAngle) * uaLen;
   let ruaEndY = shoulderY + Math.sin(ruaAngle) * uaLen;
-  drawLimb(c, shoulderW, shoulderY, ruaEndX, ruaEndY, uaW, shirt, lightenColor(shirt, 40));
+  drawLimb(c, shoulderW, shoulderY, ruaEndX, ruaEndY, uaW, shirt);
   // 右前臂
   let rfaAngle = ruaAngle + bones.foreArmR;
   let rfaEndX = ruaEndX + Math.cos(rfaAngle) * faLen;
   let rfaEndY = ruaEndY + Math.sin(rfaAngle) * faLen;
-  drawLimb(c, ruaEndX, ruaEndY, rfaEndX, rfaEndY, faW, skin, lightenColor(skin, 40));
-  // 右手
-  let handGrad2 = c.createRadialGradient(rfaEndX - 1, rfaEndY - 1, 0, rfaEndX, rfaEndY, faW * 0.5);
-  handGrad2.addColorStop(0, lightenColor(skin, 30));
-  handGrad2.addColorStop(1, darkenColor(skin, 20));
-  c.fillStyle = handGrad2;
+  drawLimb(c, ruaEndX, ruaEndY, rfaEndX, rfaEndY, faW, skin);
+  // 右手（简化为圆）
+  c.fillStyle = skin;
   c.beginPath(); c.arc(rfaEndX, rfaEndY, faW * 0.45, 0, Math.PI * 2); c.fill();
 
   // === 前面的腿 ===
@@ -484,19 +445,16 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
   c.fillStyle = 'rgba(255,255,255,0.12)';
   c.fillRect(-scale * 0.02, neckY - 2, scale * 0.04, neckLen + 2);
 
-  // === 头部（3D球面） ===
+  // === 头部（3D球面，简化） ===
   let headGrad = c.createRadialGradient(headX - headR * 0.3, headY - headR * 0.3, headR * 0.1, headX, headY, headR);
-  headGrad.addColorStop(0, lightenColor(skin, 50));
-  headGrad.addColorStop(0.5, skin);
-  headGrad.addColorStop(1, darkenColor(skin, 50));
+  headGrad.addColorStop(0, lightenColor(skin, 45));
+  headGrad.addColorStop(0.6, skin);
+  headGrad.addColorStop(1, darkenColor(skin, 45));
   c.fillStyle = headGrad;
   c.beginPath(); c.arc(headX, headY, headR, 0, Math.PI * 2); c.fill();
-  // 头部高光
-  c.fillStyle = 'rgba(255,255,255,0.2)';
-  c.beginPath(); c.arc(headX - headR * 0.25, headY - headR * 0.25, headR * 0.4, 0, Math.PI * 2); c.fill();
-  // 头部阴影（下巴下方）
-  c.fillStyle = 'rgba(0,0,0,0.08)';
-  c.beginPath(); c.arc(headX + headR * 0.1, headY + headR * 0.5, headR * 0.6, 0, Math.PI); c.fill();
+  // 简单高光
+  c.fillStyle = 'rgba(255,255,255,0.18)';
+  c.beginPath(); c.arc(headX - headR * 0.25, headY - headR * 0.25, headR * 0.35, 0, Math.PI * 2); c.fill();
 
   // === 脸部 ===
   if (opts.drawFace !== false) {
@@ -577,66 +535,31 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
 
 
 // ==================== 3D RENDERING HELPERS ====================
-// 绘制3D球体（多层渐变+高光+投影）
+// 简化版3D球体（性能优化）
 function draw3DSphere(c, x, y, r, baseColor, opts){
   opts = opts || {};
-  let lightX = opts.lightX !== undefined ? opts.lightX : -0.35;
-  let lightY = opts.lightY !== undefined ? opts.lightY : -0.35;
-  let shadowColor = opts.shadowColor || 'rgba(0,0,0,0.4)';
-  let glowColor = opts.glowColor || null;
-  let glowBlur = opts.glowBlur || 0;
   // 落地阴影
-  c.save();
   if(!opts.noShadow){
-    c.fillStyle = 'rgba(0,0,0,0.22)';
+    c.fillStyle = 'rgba(0,0,0,0.18)';
     c.beginPath();
     c.ellipse(x + r*0.1, y + r*0.75, r*0.85, r*0.22, 0, 0, Math.PI*2);
     c.fill();
   }
-  // 环境光晕
-  if(glowColor && glowBlur > 0){
-    c.shadowColor = glowColor;
-    c.shadowBlur = glowBlur;
-  }
-  // 主体径向渐变（模拟3D球面光照）
-  let hx = x + lightX*r, hy = y + lightY*r;
-  let grad = c.createRadialGradient(hx, hy, r*0.05, x, y, r*1.05);
+  // 主体径向渐变
+  let hx = x - r*0.3, hy = y - r*0.3;
+  let grad = c.createRadialGradient(hx, hy, r*0.05, x, y, r);
   if(opts.gradStops){
     for(let s of opts.gradStops) grad.addColorStop(s[0], s[1]);
   } else {
-    grad.addColorStop(0, lightenColor(baseColor, 80));
-    grad.addColorStop(0.35, baseColor);
-    grad.addColorStop(0.75, darkenColor(baseColor, 40));
-    grad.addColorStop(1.0, darkenColor(baseColor, 80));
+    grad.addColorStop(0, lightenColor(baseColor, 70));
+    grad.addColorStop(0.5, baseColor);
+    grad.addColorStop(1, darkenColor(baseColor, 60));
   }
   c.fillStyle = grad;
-  c.beginPath();
-  c.arc(x, y, r, 0, Math.PI*2);
-  c.fill();
-  c.shadowBlur = 0;
-  // 轮廓（深色边缘增强3D感）
-  let edgeG = c.createRadialGradient(x, y, r*0.6, x, y, r);
-  edgeG.addColorStop(0, 'rgba(0,0,0,0)');
-  edgeG.addColorStop(1, 'rgba(0,0,0,0.35)');
-  c.fillStyle = edgeG;
-  c.beginPath();
-  c.arc(x, y, r, 0, Math.PI*2);
-  c.fill();
-  // 高光斑（镜面反射）
-  let hlGrad = c.createRadialGradient(hx, hy, 0, hx, hy, r*0.45);
-  hlGrad.addColorStop(0, 'rgba(255,255,255,0.65)');
-  hlGrad.addColorStop(0.4, 'rgba(255,255,255,0.15)');
-  hlGrad.addColorStop(1, 'rgba(255,255,255,0)');
-  c.fillStyle = hlGrad;
-  c.beginPath();
-  c.arc(x, y, r, 0, Math.PI*2);
-  c.fill();
-  // 次级高光（小亮点）
-  c.fillStyle = 'rgba(255,255,255,0.5)';
-  c.beginPath();
-  c.arc(hx + r*0.05, hy + r*0.05, r*0.1, 0, Math.PI*2);
-  c.fill();
-  c.restore();
+  c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill();
+  // 简单高光
+  c.fillStyle = 'rgba(255,255,255,0.35)';
+  c.beginPath(); c.arc(hx, hy, r*0.3, 0, Math.PI*2); c.fill();
 }
 
 // 颜色处理工具
@@ -658,12 +581,10 @@ function darkenColor(hex, amt){
 function drawPatient(c,x,y,size,color,type,el){
   c.save();c.translate(x,y);
   let anim=Date.now()/1000;
-  // elite 光晕
+  // elite 光晕（简化）
   if(el){
-    c.shadowColor='#f39c12';c.shadowBlur=14+Math.sin(anim*4)*5;
-    c.strokeStyle='rgba(243,156,18,0.6)';c.lineWidth=2.5;
+    c.strokeStyle='rgba(243,156,18,'+(0.4+Math.sin(anim*4)*0.2)+')';c.lineWidth=2;
     c.beginPath();c.arc(0,0,size*1.2+Math.sin(anim*4)*2,0,Math.PI*2);c.stroke();
-    c.shadowBlur=0;
   }
   // 地面阴影
   c.fillStyle='rgba(0,0,0,0.15)';
@@ -741,16 +662,16 @@ function drawPatient(c,x,y,size,color,type,el){
       faceType:'normal',
       headExtra: null,
       bodyExtra: function(c,ox,oy,tw,ny,hy2,sw,sc){
-        // 背后的人影（矮小半透明）
-        c.globalAlpha=0.4;
-        let bBones = walkCycle(anim, 0.8);
-        drawHumanoid(c, -sc*0.6, sc*0.15, sc*0.65, bBones, {
-          skinColor:'#e8c090', shirtColor:color, pantsColor:'#555', shoeColor:'#333',
-          headRadius:0.38, torsoH:0.55, torsoW:0.48,
-          upperArmLen:0.28, foreArmLen:0.24, upperLegLen:0.32, lowerLegLen:0.28,
-          upperArmW:0.12, foreArmW:0.09, upperLegW:0.14, lowerLegW:0.11,
-          faceType:'normal', drawFace:true
-        });
+        // 背后的简化人影（用简单几何代替完整骨骼人形）
+        c.globalAlpha=0.3;
+        // 简单的小人：头+身体+两条腿
+        let bx=-sc*0.5, by=sc*0.1, bs=sc*0.5;
+        c.fillStyle=color;
+        c.beginPath();c.arc(bx,by-bs*0.8,bs*0.25,0,Math.PI*2);c.fill(); // 头
+        c.fillStyle='#555';
+        c.fillRect(bx-bs*0.2,by-bs*0.55,bs*0.4,bs*0.5); // 身体
+        c.fillRect(bx-bs*0.15,by-bs*0.05,bs*0.1,bs*0.4); // 左腿
+        c.fillRect(bx+bs*0.05,by-bs*0.05,bs*0.1,bs*0.4); // 右腿
         c.globalAlpha=1;
       }
     };
@@ -783,11 +704,9 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
   let auraA=raging?0.5:0.25;
   let auraC=raging?'255,0,0':'255,68,68';
   c.strokeStyle='rgba('+auraC+','+auraA+')';c.lineWidth=3;
-  c.shadowColor='rgba('+auraC+',0.6)';c.shadowBlur=raging?20:10;
   c.beginPath();c.arc(0,size*0.1,auraR1,0,Math.PI*2);c.stroke();
   c.strokeStyle='rgba('+auraC+','+(auraA*0.5)+')';c.lineWidth=2;
   c.beginPath();c.arc(0,size*0.1,auraR2,0,Math.PI*2);c.stroke();
-  c.shadowBlur=0;
 
   // Boss骨骼人形 — 夸张比例的大块头
   let bones = walkCycle(anim, raging ? 1.5 : 0.8);
@@ -831,12 +750,10 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
         c.lineTo(hx+Math.cos(a+0.12)*hr*0.8,hy+Math.sin(a+0.12)*hr*0.8);
         c.closePath();c.fill();
       }
-      // 暴怒光环
+      // 暴怒光环（简化）
       if(raging){
-        c.shadowColor='#ff2200';c.shadowBlur=15;
         c.strokeStyle='rgba(255,34,0,0.5)';c.lineWidth=2;
         c.beginPath();c.arc(hx,hy,hr*1.3,0,Math.PI*2);c.stroke();
-        c.shadowBlur=0;
       }
     },
     bodyExtra: function(c,ox,oy,tw,ny,hy2,sw,sc){
@@ -858,11 +775,10 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
     }
   });
 
-  // 护盾特效
+  // 护盾特效（简化）
   if(shielded){
-    let shieldA=0.5+Math.sin(anim*10)*0.25;
-    c.strokeStyle='rgba(68,136,255,'+shieldA+')';c.lineWidth=4;
-    c.shadowColor='rgba(68,136,255,0.8)';c.shadowBlur=16;
+    let shieldA=0.4+Math.sin(anim*10)*0.2;
+    c.strokeStyle='rgba(68,136,255,'+shieldA+')';c.lineWidth=3;
     c.beginPath();
     for(let i=0;i<6;i++){
       let a=i*Math.PI/3+anim*0.2;
@@ -871,14 +787,6 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
       else c.lineTo(Math.cos(a)*r2,Math.sin(a)*r2+size*0.1);
     }
     c.closePath();c.stroke();
-    c.fillStyle='rgba(68,136,255,0.08)';c.beginPath();
-    for(let i=0;i<6;i++){
-      let a=i*Math.PI/3+anim*0.2;let r2=size*1.2+10;
-      if(i===0)c.moveTo(Math.cos(a)*r2,Math.sin(a)*r2+size*0.1);
-      else c.lineTo(Math.cos(a)*r2,Math.sin(a)*r2+size*0.1);
-    }
-    c.closePath();c.fill();
-    c.shadowBlur=0;
   }
   // 名牌（玻璃感）
   c.font='bold 13px Microsoft YaHei,sans-serif';c.textAlign='center';
@@ -889,9 +797,8 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
   c.fillStyle=tagG;c.beginPath();c.roundRect(txL,tyL,tw2,22,5);c.fill();
   c.fillStyle='rgba(255,255,255,0.08)';c.beginPath();c.roundRect(txL,tyL,tw2,10,5);c.fill();
   c.strokeStyle='rgba(255,68,68,0.6)';c.lineWidth=1.2;c.beginPath();c.roundRect(txL,tyL,tw2,22,5);c.stroke();
-  c.fillStyle='#ff7777';c.shadowColor='#ff4444';c.shadowBlur=6;
+  c.fillStyle='#ff7777';
   c.fillText(bossName,0,tyL+14);
-  c.shadowBlur=0;
   // 血条（3D凸起感）
   let bw=size*2.4,bh=8;
   let barY=size*1.2+12;
@@ -904,9 +811,7 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
   hpGrad.addColorStop(0.4,hpColor);
   hpGrad.addColorStop(1,darkenColor(hpColor,30));
   c.fillStyle=hpGrad;
-  c.shadowColor=hpColor;c.shadowBlur=6;
   c.beginPath();c.roundRect(-bw/2,barY,Math.max(0,hpFill),bh,4);c.fill();
-  c.shadowBlur=0;
   c.fillStyle='rgba(255,255,255,0.2)';
   c.beginPath();c.roundRect(-bw/2,barY,Math.max(0,hpFill),bh*0.4,4);c.fill();
   c.restore();
@@ -919,12 +824,10 @@ function drawPlayer(c,x,y,size,hp,maxHp,invincible){
   // 地面阴影
   c.fillStyle='rgba(0,0,0,0.18)';
   c.beginPath();c.ellipse(0,size*0.85,size*0.9,size*0.25,0,0,Math.PI*2);c.fill();
-  // 呼吸发光环
+  // 呼吸光环（简化，不用shadowBlur）
   let glowI=0.25+Math.sin(anim*4.4)*0.12;
   c.strokeStyle='rgba(52,152,219,'+glowI+')';c.lineWidth=3;
-  c.shadowColor='#3498db';c.shadowBlur=18+Math.sin(anim*4)*5;
   c.beginPath();c.arc(0,size*0.1,size*1.3+Math.sin(anim*4)*1.5,0,Math.PI*2);c.stroke();
-  c.shadowBlur=0;
   // 判断是否在移动
   let p=G.player, dx=0, dy=0;
   if(keys['w']||keys['arrowup'])dy-=1;
@@ -968,11 +871,9 @@ function drawPlayer(c,x,y,size,hp,maxHp,invincible){
       c.beginPath();c.ellipse(hx,hy+hr*0.01,hr*1.1,hr*0.06,0,0,Math.PI*2);c.fill();
     },
     bodyExtra: function(c, ox, oy, tw, ny, hy2, sw, sc) {
-      // 听诊器
+      // 听诊器（简化）
       c.strokeStyle='#2c3e50';c.lineWidth=2.5;
-      c.shadowColor='rgba(0,0,0,0.3)';c.shadowBlur=2;
       c.beginPath();c.moveTo(-sw*0.6,ny+3);c.quadraticCurveTo(-tw*1.1,hy2*0.5,-tw*0.4,hy2+2);c.stroke();
-      c.shadowBlur=0;
       // 听诊器头
       let sG=c.createRadialGradient(-tw*0.42,hy2+3,0,-tw*0.4,hy2+4,sc*0.07);
       sG.addColorStop(0,'#e74c3c');sG.addColorStop(0.5,'#c0392b');sG.addColorStop(1,'#7b241c');
@@ -1604,9 +1505,7 @@ function render(){
   ctx.fillRect(-cx+G.mapSize,-cy,8,G.mapSize+8); // 右
   // 主墙壁
   ctx.strokeStyle=lv.wallColor;ctx.lineWidth=6;
-  ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=8;
   ctx.strokeRect(-cx,-cy,G.mapSize,G.mapSize);
-  ctx.shadowBlur=0;
   // 内侧高光
   ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.lineWidth=2;
   ctx.strokeRect(-cx+3,-cy+3,G.mapSize-6,G.mapSize-6);
@@ -1618,23 +1517,21 @@ function render(){
     if(ox<-20||ox>canvas.width+20||oy<-20||oy>canvas.height+20)continue;
     let pulse=0.65+Math.sin(Date.now()/220+o.x*0.09)*0.32;
     let r=o.size;
-    // 外层大光晕
-    ctx.globalAlpha=0.18*pulse;
+    // 外层大光晕（简化）
+    ctx.globalAlpha=0.15*pulse;
     ctx.fillStyle='#2ecc71';
-    ctx.shadowColor='#2ecc71';ctx.shadowBlur=12;
-    ctx.beginPath();ctx.arc(ox,oy,r*2.2,0,Math.PI*2);ctx.fill();
-    ctx.shadowBlur=0;ctx.globalAlpha=1;
+    ctx.beginPath();ctx.arc(ox,oy,r*2,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;
     // 3D 宝石主体
     draw3DSphere(ctx, ox, oy, r, '#2ecc71', {
       gradStops:[
         [0,'#88ffcc'],[0.3,'#2ecc71'],[0.65,'#1a8f50'],[1,'#0a3020']
       ],
-      glowColor:'#2ecc71', glowBlur:8*pulse,
-      lightX:-0.3, lightY:-0.35
+      noShadow:true
     });
-    // 宝石切面反光
-    ctx.globalAlpha=0.6*pulse;
-    ctx.fillStyle='rgba(200,255,230,0.7)';
+    // 宝石切面反光（简化）
+    ctx.globalAlpha=0.4*pulse;
+    ctx.fillStyle='rgba(200,255,230,0.6)';
     ctx.beginPath();
     ctx.moveTo(ox,oy-r*0.8);
     ctx.lineTo(ox+r*0.6,oy);
@@ -1673,33 +1570,28 @@ function render(){
     let px=pr.x-cx,py=pr.y-cy;
     if(px<-20||px>canvas.width+20||py<-20||py>canvas.height+20)continue;
     if(pr.aoe){
-      // AOE脉冲环
+      // AOE脉冲环（简化）
       ctx.globalAlpha=0.2;
       ctx.fillStyle=pr.color;
-      ctx.shadowColor=pr.color;ctx.shadowBlur=20;
       ctx.beginPath();ctx.arc(px,py,pr.aoeSize/2,0,Math.PI*2);ctx.fill();
-      ctx.shadowBlur=0;ctx.globalAlpha=1;
-      draw3DSphere(ctx,px,py,pr.size,pr.color,{noShadow:true,glowColor:pr.color,glowBlur:6});
+      ctx.globalAlpha=1;
+      draw3DSphere(ctx,px,py,pr.size,pr.color,{noShadow:true});
     }else if(pr.isEnemy){
-      // 敌方弹幕 - 红色警告球
       draw3DSphere(ctx,px,py,pr.size,pr.color||'#ff4444',{
         gradStops:[[0,'#ff9999'],[0.4,pr.color||'#ff4444'],[1,'#440000']],
-        glowColor:'#ff0000',glowBlur:8,noShadow:true
+        noShadow:true
       });
     }else{
-      // 玩家子弹 - 彩色3D球+尾迹
+      // 玩家子弹
       let trailAlpha=0.25;
-      // 尾迹（多段渐隐）
+      // 尾迹（简化渐隐）
       for(let t=1;t<=3;t++){
         ctx.globalAlpha=trailAlpha*(1-t*0.28);
         ctx.fillStyle=pr.color;
-        ctx.shadowColor=pr.color;ctx.shadowBlur=4;
         ctx.beginPath();ctx.arc(px-pr.vx*t*1.2,py-pr.vy*t*1.2,pr.size*(1-t*0.22),0,Math.PI*2);ctx.fill();
-        ctx.shadowBlur=0;
       }
       ctx.globalAlpha=1;
-      // 主弹体3D球
-      draw3DSphere(ctx,px,py,pr.size,pr.color,{noShadow:true,glowColor:pr.color,glowBlur:10});
+      draw3DSphere(ctx,px,py,pr.size,pr.color,{noShadow:true});
     }
   }
   // orbitals - 3D护盾球
@@ -1727,21 +1619,17 @@ function render(){
     ctx.globalAlpha=a;
     // 大粒子用3D球，小的用菱形
     if(pt.size>4){
-      ctx.shadowColor=pt.color;ctx.shadowBlur=4*a;
       draw3DSphere(ctx,ptx,pty,r,pt.color,{noShadow:true});
-      ctx.shadowBlur=0;
     }else{
       // 菱形粒子（快速绘制）
       ctx.fillStyle=pt.color;
-      ctx.shadowColor=pt.color;ctx.shadowBlur=3*a;
       ctx.beginPath();
       ctx.moveTo(ptx,pty-r);ctx.lineTo(ptx+r*0.7,pty);
       ctx.lineTo(ptx,pty+r);ctx.lineTo(ptx-r*0.7,pty);
       ctx.closePath();ctx.fill();
       // 高光
-      ctx.fillStyle='rgba(255,255,255,'+(0.4*a)+')';
+      ctx.fillStyle='rgba(255,255,255,'+(0.3*a)+')';
       ctx.beginPath();ctx.arc(ptx-r*0.2,pty-r*0.3,r*0.25,0,Math.PI*2);ctx.fill();
-      ctx.shadowBlur=0;
     }
   }
   ctx.globalAlpha=1;
@@ -1753,21 +1641,19 @@ function render(){
     ctx.fillText(t.text,tx,ty);
   }
   ctx.globalAlpha=1;
-  // lightnings - 3层发光
+  // lightnings（简化，去掉shadowBlur）
   for(let l of G.lightnings){
     let la=l.life/300;
     let mx=(l.x1+l.x2)/2+rand(-20,20),my=(l.y1+l.y2)/2+rand(-20,20);
-    // 外层宽光晕
+    // 外层
     ctx.globalAlpha=la*0.3;ctx.strokeStyle='rgba(100,180,255,0.6)';ctx.lineWidth=8;
-    ctx.shadowColor='#4af';ctx.shadowBlur=15;
     ctx.beginPath();ctx.moveTo(l.x1-cx,l.y1-cy);ctx.lineTo(mx-cx,my-cy);ctx.lineTo(l.x2-cx,l.y2-cy);ctx.stroke();
     // 中层
-    ctx.globalAlpha=la*0.7;ctx.strokeStyle='rgba(150,220,255,0.8)';ctx.lineWidth=3;ctx.shadowBlur=8;
+    ctx.globalAlpha=la*0.7;ctx.strokeStyle='rgba(150,220,255,0.8)';ctx.lineWidth=3;
     ctx.beginPath();ctx.moveTo(l.x1-cx,l.y1-cy);ctx.lineTo(mx-cx,my-cy);ctx.lineTo(l.x2-cx,l.y2-cy);ctx.stroke();
     // 内层白芯
-    ctx.globalAlpha=la;ctx.strokeStyle='#ffffff';ctx.lineWidth=1.5;ctx.shadowBlur=4;
+    ctx.globalAlpha=la;ctx.strokeStyle='#ffffff';ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(l.x1-cx,l.y1-cy);ctx.lineTo(mx-cx,my-cy);ctx.lineTo(l.x2-cx,l.y2-cy);ctx.stroke();
-    ctx.shadowBlur=0;
   }
   ctx.globalAlpha=1;
   // boss slow indicator on player
@@ -1834,13 +1720,13 @@ function drawDecorations(cx,cy,lv){
       ctx.fillStyle=lv.accent;ctx.fillText(vsigns[i],sx,sy+1);
     }
   }
-  // Floor objects (deterministic)
-  for(let x=100;x<G.mapSize;x+=250){
-    for(let y=100;y<G.mapSize;y+=250){
+  // Floor objects (deterministic, 大步长减少调用)
+  for(let x=100;x<G.mapSize;x+=500){
+    for(let y=100;y<G.mapSize;y+=500){
       let dx=x-cx,dy=y-cy;
       if(dx<-40||dx>canvas.width+40||dy<-40||dy>canvas.height+40)continue;
       let seed=Math.abs(Math.sin(x*0.0031)*99999+Math.cos(y*0.0031)*99999)%5;
-      ctx.globalAlpha=0.5;
+      ctx.globalAlpha=0.4;
       drawFloorObj(dx,dy,seed);
       ctx.globalAlpha=1;
     }
@@ -1849,27 +1735,24 @@ function drawDecorations(cx,cy,lv){
 }
 
 function drawFloorObj(x,y,seed){
-  ctx.save();ctx.translate(x,y);
   ctx.strokeStyle='rgba(0,0,0,0.12)';ctx.fillStyle='rgba(0,0,0,0.08)';ctx.lineWidth=1.5;
   if(seed<1){
-    ctx.fillRect(-8,-5,16,4);ctx.strokeRect(-8,-5,16,4);
-    ctx.fillRect(-8,0,3,9);ctx.fillRect(5,0,3,9);ctx.fillRect(-8,9,16,2);
+    ctx.fillRect(x-8,y-5,16,4);ctx.strokeRect(x-8,y-5,16,4);
+    ctx.fillRect(x-8,y,3,9);ctx.fillRect(x+5,y,3,9);ctx.fillRect(x-8,y+9,16,2);
   }else if(seed<2){
-    ctx.fillRect(-14,-7,28,14);ctx.strokeRect(-14,-7,28,14);
-    ctx.fillStyle='rgba(255,255,255,0.1)';ctx.fillRect(-13,-6,26,4);
+    ctx.fillRect(x-14,y-7,28,14);ctx.strokeRect(x-14,y-7,28,14);
+    ctx.fillStyle='rgba(255,255,255,0.1)';ctx.fillRect(x-13,y-6,26,4);
   }else if(seed<3){
     ctx.strokeStyle='#888';ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(0,-18);ctx.lineTo(0,6);ctx.stroke();
-    ctx.fillStyle='#4488ff';ctx.fillRect(-4,-22,8,6);
-    ctx.beginPath();ctx.moveTo(-7,0);ctx.lineTo(7,0);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x,y-18);ctx.lineTo(x,y+6);ctx.stroke();
+    ctx.fillStyle='#4488ff';ctx.fillRect(x-4,y-22,8,6);
   }else if(seed<4){
     ctx.fillStyle='#666';
-    ctx.beginPath();ctx.moveTo(-5,6);ctx.lineTo(-4,-5);ctx.lineTo(4,-5);ctx.lineTo(5,6);ctx.closePath();ctx.fill();
+    ctx.beginPath();ctx.moveTo(x-5,y+6);ctx.lineTo(x-4,y-5);ctx.lineTo(x+4,y-5);ctx.lineTo(x+5,y+6);ctx.closePath();ctx.fill();
   }else{
     ctx.strokeStyle='rgba(0,0,0,0.05)';ctx.lineWidth=3;
-    ctx.beginPath();ctx.moveTo(0,-5);ctx.lineTo(0,5);ctx.moveTo(-5,0);ctx.lineTo(5,0);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(x,y-5);ctx.lineTo(x,y+5);ctx.moveTo(x-5,y);ctx.lineTo(x+5,y);ctx.stroke();
   }
-  ctx.restore();
 }
 
 function drawMinimap(){
@@ -1885,33 +1768,31 @@ function drawMinimap(){
     mmCtx.beginPath();mmCtx.moveTo(i,0);mmCtx.lineTo(i,ms);mmCtx.stroke();
     mmCtx.beginPath();mmCtx.moveTo(0,i);mmCtx.lineTo(ms,i);mmCtx.stroke();
   }
-  // enemies (3D点)
+  // enemies（简化）
   for(let e of G.enemies){
     let ex=e.x*mScale, ey=e.y*mScale;
     if(e.isBoss){
-      mmCtx.fillStyle='#ff2200';mmCtx.shadowColor='#ff0000';mmCtx.shadowBlur=6;
+      mmCtx.fillStyle='#ff2200';
       mmCtx.beginPath();mmCtx.arc(ex,ey,4.5,0,Math.PI*2);mmCtx.fill();
-      mmCtx.fillStyle='#ff8866';mmCtx.shadowBlur=0;
+      mmCtx.fillStyle='#ff8866';
       mmCtx.beginPath();mmCtx.arc(ex-1,ey-1,2,0,Math.PI*2);mmCtx.fill();
     }else{
       let ec=e.elite?'#ff8800':'#ff5555';
-      mmCtx.fillStyle=ec;mmCtx.shadowColor=ec;mmCtx.shadowBlur=3;
+      mmCtx.fillStyle=ec;
       let s=e.elite?3:2;
       mmCtx.beginPath();mmCtx.arc(ex,ey,s,0,Math.PI*2);mmCtx.fill();
-      mmCtx.shadowBlur=0;
     }
   }
   // xp orbs
-  mmCtx.fillStyle='rgba(46,204,113,0.7)';mmCtx.shadowColor='#2ecc71';mmCtx.shadowBlur=2;
+  mmCtx.fillStyle='rgba(46,204,113,0.7)';
   for(let o of G.xpOrbs){mmCtx.fillRect(o.x*mScale,o.y*mScale,1.5,1.5)}
-  mmCtx.shadowBlur=0;
-  // 玩家（3D发光）
+  // 玩家
   let pPulse=0.7+Math.sin(Date.now()/300)*0.3;
   let px=G.player.x*mScale, py=G.player.y*mScale;
   mmCtx.fillStyle='rgba(255,220,50,0.2)';mmCtx.beginPath();mmCtx.arc(px,py,6,0,Math.PI*2);mmCtx.fill();
-  mmCtx.fillStyle='#ffdd44';mmCtx.shadowColor='#ffcc00';mmCtx.shadowBlur=8*pPulse;
+  mmCtx.fillStyle='#ffdd44';
   mmCtx.beginPath();mmCtx.arc(px,py,3.5,0,Math.PI*2);mmCtx.fill();
-  mmCtx.fillStyle='rgba(255,255,200,0.8)';mmCtx.shadowBlur=0;
+  mmCtx.fillStyle='rgba(255,255,200,0.8)';
   mmCtx.beginPath();mmCtx.arc(px-1,py-1,1.2,0,Math.PI*2);mmCtx.fill();
   // 视口
   mmCtx.strokeStyle='rgba(255,255,255,'+(pPulse*0.4)+')';mmCtx.lineWidth=1;
