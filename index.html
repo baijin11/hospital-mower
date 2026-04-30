@@ -260,26 +260,14 @@ function drawLimb(c, x1, y1, x2, y2, thickness, color) {
   let dx = x2 - x1, dy = y2 - y1;
   let len = Math.hypot(dx, dy);
   if (len < 1) return;
-  let a = Math.atan2(dy, dx);
-  c.save();
-  c.translate(x1, y1);
-  c.rotate(a);
-  let r = thickness / 2;
-  // 简化渐变：2段代替4段，性能提升30%+
-  let grad = c.createLinearGradient(0, -r, 0, r);
-  grad.addColorStop(0, lightenColor(color, 40));
-  grad.addColorStop(0.5, color);
-  grad.addColorStop(1, darkenColor(color, 40));
-  c.fillStyle = grad;
+  c.strokeStyle = color;
+  c.lineWidth = thickness;
+  c.lineCap = 'round';
   c.beginPath();
-  c.moveTo(r, 0);
-  c.lineTo(len - r, 0);
-  c.arc(len - r, 0, r, 0, Math.PI);
-  c.lineTo(r, r);
-  c.arc(r, 0, r, Math.PI, 0);
-  c.closePath();
-  c.fill();
-  c.restore();
+  c.moveTo(x1, y1);
+  c.lineTo(x2, y2);
+  c.stroke();
+  c.lineCap = 'butt';
 }
 
 function walkCycle(t, speed) {
@@ -383,15 +371,9 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
   // 左脚（椭圆）
   c.fillStyle = shoe;
   c.beginPath(); c.ellipse(lllEndX + 3, lllEndY, llW * 0.7, llW * 0.4, 0.2, 0, Math.PI * 2); c.fill();
-  c.fillStyle = 'rgba(255,255,255,0.15)';
-  c.beginPath(); c.ellipse(lllEndX + 2, lllEndY - 1, llW * 0.4, llW * 0.2, 0.2, 0, Math.PI * 2); c.fill();
 
-  // === 躯干（简化3D感） ===
-  let bodyGrad = c.createLinearGradient(-torsoW, 0, torsoW, 0);
-  bodyGrad.addColorStop(0, darkenColor(shirt, 35));
-  bodyGrad.addColorStop(0.5, lightenColor(shirt, 25));
-  bodyGrad.addColorStop(1, darkenColor(shirt, 35));
-  c.fillStyle = bodyGrad;
+  // === 躯干（纯色简化） ===
+  c.fillStyle = shirt;
   c.beginPath();
   let bodyTop = neckY - 2, bodyBot = hipY;
   let bw = torsoW, br = torsoW * 0.25;
@@ -436,21 +418,13 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
   // 右脚
   c.fillStyle = shoe;
   c.beginPath(); c.ellipse(rllEndX + 3, rllEndY, llW * 0.7, llW * 0.4, 0.2, 0, Math.PI * 2); c.fill();
-  c.fillStyle = 'rgba(255,255,255,0.15)';
-  c.beginPath(); c.ellipse(rllEndX + 2, rllEndY - 1, llW * 0.4, llW * 0.2, 0.2, 0, Math.PI * 2); c.fill();
 
   // === 脖子 ===
   c.fillStyle = skin;
   c.fillRect(-scale * 0.06, neckY - 2, scale * 0.12, neckLen + 2);
-  c.fillStyle = 'rgba(255,255,255,0.12)';
-  c.fillRect(-scale * 0.02, neckY - 2, scale * 0.04, neckLen + 2);
 
-  // === 头部（3D球面，简化） ===
-  let headGrad = c.createRadialGradient(headX - headR * 0.3, headY - headR * 0.3, headR * 0.1, headX, headY, headR);
-  headGrad.addColorStop(0, lightenColor(skin, 45));
-  headGrad.addColorStop(0.6, skin);
-  headGrad.addColorStop(1, darkenColor(skin, 45));
-  c.fillStyle = headGrad;
+  // === 头部（纯色球面） ===
+  c.fillStyle = skin;
   c.beginPath(); c.arc(headX, headY, headR, 0, Math.PI * 2); c.fill();
   // 简单高光
   c.fillStyle = 'rgba(255,255,255,0.18)';
@@ -535,31 +509,25 @@ function drawHumanoid(c, x, y, scale, bones, opts) {
 
 
 // ==================== 3D RENDERING HELPERS ====================
-// 简化版3D球体（性能优化）
+// 极简球体（纯色+高光点，零渐变）
 function draw3DSphere(c, x, y, r, baseColor, opts){
   opts = opts || {};
-  // 落地阴影
   if(!opts.noShadow){
-    c.fillStyle = 'rgba(0,0,0,0.18)';
+    c.fillStyle = 'rgba(0,0,0,0.15)';
     c.beginPath();
     c.ellipse(x + r*0.1, y + r*0.75, r*0.85, r*0.22, 0, 0, Math.PI*2);
     c.fill();
   }
-  // 主体径向渐变
-  let hx = x - r*0.3, hy = y - r*0.3;
-  let grad = c.createRadialGradient(hx, hy, r*0.05, x, y, r);
+  // 主体纯色
   if(opts.gradStops){
-    for(let s of opts.gradStops) grad.addColorStop(s[0], s[1]);
+    c.fillStyle = opts.gradStops[1] ? opts.gradStops[1][1] : baseColor;
   } else {
-    grad.addColorStop(0, lightenColor(baseColor, 70));
-    grad.addColorStop(0.5, baseColor);
-    grad.addColorStop(1, darkenColor(baseColor, 60));
+    c.fillStyle = baseColor;
   }
-  c.fillStyle = grad;
   c.beginPath(); c.arc(x, y, r, 0, Math.PI*2); c.fill();
-  // 简单高光
-  c.fillStyle = 'rgba(255,255,255,0.35)';
-  c.beginPath(); c.arc(hx, hy, r*0.3, 0, Math.PI*2); c.fill();
+  // 单个小高光点
+  c.fillStyle = 'rgba(255,255,255,0.3)';
+  c.beginPath(); c.arc(x - r*0.25, y - r*0.25, r*0.2, 0, Math.PI*2); c.fill();
 }
 
 // 颜色处理工具
@@ -629,19 +597,14 @@ function drawPatient(c,x,y,size,color,type,el){
       upperArmW:0.14, foreArmW:0.11, upperLegW:0.18, lowerLegW:0.14,
       faceType:'glasses',
       headExtra: function(c,ox,oy,hx,hy,hr,sc){
-        // 秃头高光
-        let baldG=c.createRadialGradient(hx-hr*0.2,hy-hr*0.4,0,hx,hy-hr*0.3,hr*0.8);
-        baldG.addColorStop(0,'rgba(255,255,255,0.15)');baldG.addColorStop(1,'rgba(255,255,255,0)');
-        c.fillStyle=baldG;c.beginPath();c.arc(hx,hy-hr*0.3,hr*0.8,Math.PI+0.3,-0.3);c.fill();
+        // 秃头高光（纯色）
+        c.fillStyle='rgba(255,255,255,0.12)';
+        c.beginPath();c.arc(hx,hy-hr*0.3,hr*0.6,Math.PI+0.3,-0.3);c.fill();
       },
       bodyExtra: function(c,ox,oy,tw,ny,hy2,sw,sc){
-        // 领带
-        let tG=c.createLinearGradient(0,ny,0,ny+sc*0.3);
-        tG.addColorStop(0,'#e74c3c');tG.addColorStop(1,'#7b241c');
-        c.fillStyle=tG;
+        // 领带（纯色）
+        c.fillStyle='#c0392b';
         c.beginPath();c.moveTo(-4,ny+5);c.lineTo(4,ny+5);c.lineTo(3,ny+sc*0.3);c.lineTo(-3,ny+sc*0.3);c.closePath();c.fill();
-        c.fillStyle='rgba(255,255,255,0.2)';
-        c.beginPath();c.moveTo(-3,ny+5);c.lineTo(0,ny+sc*0.15);c.lineTo(-1,ny+sc*0.3);c.closePath();c.fill();
       }
     };
   }else if(type==='fast'){
@@ -757,17 +720,11 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
       }
     },
     bodyExtra: function(c,ox,oy,tw,ny,hy2,sw,sc){
-      // Boss手机（更大的3D手机）
+      // Boss手机（纯色）
       c.fillStyle='#0a0a1e';
       c.beginPath();c.roundRect(sw+sc*0.1,ny+sc*0.1,sc*0.22,sc*0.35,3);c.fill();
-      let phoneG=c.createLinearGradient(sw+sc*0.1,ny+sc*0.1,sw+sc*0.32,ny+sc*0.1);
-      phoneG.addColorStop(0,'rgba(255,255,255,0.15)');phoneG.addColorStop(1,'rgba(255,255,255,0)');
-      c.fillStyle=phoneG;c.beginPath();c.roundRect(sw+sc*0.1,ny+sc*0.1,sc*0.22,sc*0.35,3);c.fill();
       c.fillStyle='rgba(68,136,255,0.9)';
       c.beginPath();c.roundRect(sw+sc*0.13,ny+sc*0.14,sc*0.16,sc*0.25,2);c.fill();
-      c.fillStyle='rgba(255,255,255,0.3)';
-      c.beginPath();c.moveTo(sw+sc*0.13,ny+sc*0.14);c.lineTo(sw+sc*0.29,ny+sc*0.14);
-      c.lineTo(sw+sc*0.13,ny+sc*0.3);c.closePath();c.fill();
       // 肩章（Boss标识）
       c.fillStyle='rgba(255,215,0,0.6)';
       c.beginPath();c.roundRect(-sw-tw*0.1,ny-2,tw*0.2,sc*0.06,2);c.fill();
@@ -788,32 +745,23 @@ function drawBoss(c,x,y,size,bossName,hp,maxHp,color,shielded,raging){
     }
     c.closePath();c.stroke();
   }
-  // 名牌（玻璃感）
+  // 名牌（纯色）
   c.font='bold 13px Microsoft YaHei,sans-serif';c.textAlign='center';
   let tw2=c.measureText(bossName).width+24;
   let txL=-tw2/2, tyL=-size*1.2-28;
-  let tagG=c.createLinearGradient(txL,tyL,txL,tyL+22);
-  tagG.addColorStop(0,'rgba(20,0,0,0.9)');tagG.addColorStop(1,'rgba(60,0,0,0.85)');
-  c.fillStyle=tagG;c.beginPath();c.roundRect(txL,tyL,tw2,22,5);c.fill();
-  c.fillStyle='rgba(255,255,255,0.08)';c.beginPath();c.roundRect(txL,tyL,tw2,10,5);c.fill();
+  c.fillStyle='rgba(20,0,0,0.9)';c.beginPath();c.roundRect(txL,tyL,tw2,22,5);c.fill();
   c.strokeStyle='rgba(255,68,68,0.6)';c.lineWidth=1.2;c.beginPath();c.roundRect(txL,tyL,tw2,22,5);c.stroke();
   c.fillStyle='#ff7777';
   c.fillText(bossName,0,tyL+14);
-  // 血条（3D凸起感）
+  // 血条（纯色）
   let bw=size*2.4,bh=8;
   let barY=size*1.2+12;
   c.fillStyle='rgba(0,0,0,0.7)';c.beginPath();c.roundRect(-bw/2,barY,bw,bh,4);c.fill();
   let hpRatio=hp/maxHp;
   let hpFill=bw*hpRatio;
   let hpColor=hpRatio>0.5?'#e74c3c':hpRatio>0.25?'#ff6600':'#ff0000';
-  let hpGrad=c.createLinearGradient(-bw/2,barY,-bw/2,barY+bh);
-  hpGrad.addColorStop(0,lightenColor(hpColor,40));
-  hpGrad.addColorStop(0.4,hpColor);
-  hpGrad.addColorStop(1,darkenColor(hpColor,30));
-  c.fillStyle=hpGrad;
+  c.fillStyle=hpColor;
   c.beginPath();c.roundRect(-bw/2,barY,Math.max(0,hpFill),bh,4);c.fill();
-  c.fillStyle='rgba(255,255,255,0.2)';
-  c.beginPath();c.roundRect(-bw/2,barY,Math.max(0,hpFill),bh*0.4,4);c.fill();
   c.restore();
 }
 
@@ -856,10 +804,8 @@ function drawPlayer(c,x,y,size,hp,maxHp,invincible){
     lowerLegW: 0.13,
     faceType: 'glasses',
     headExtra: function(c, ox, oy, hx, hy, hr, sc) {
-      // 绿色手术帽
-      let capG=c.createRadialGradient(hx-hr*0.3,hy-hr*0.5,hr*0.1,hx,hy,hr*1.15);
-      capG.addColorStop(0,'#3dce78');capG.addColorStop(0.6,'#27ae60');capG.addColorStop(1,'#1a7a42');
-      c.fillStyle=capG;
+      // 绿色手术帽（纯色）
+      c.fillStyle='#27ae60';
       c.beginPath();c.arc(hx,hy,hr*1.1,Math.PI+0.3,-0.3);c.fill();
       // 帽子高光
       c.fillStyle='rgba(255,255,255,0.2)';
@@ -867,28 +813,20 @@ function drawPlayer(c,x,y,size,hp,maxHp,invincible){
       // 帽沿
       c.fillStyle='#1a7a42';
       c.beginPath();c.ellipse(hx,hy+hr*0.05,hr*1.12,hr*0.12,0,0,Math.PI*2);c.fill();
-      c.fillStyle='rgba(255,255,255,0.15)';
-      c.beginPath();c.ellipse(hx,hy+hr*0.01,hr*1.1,hr*0.06,0,0,Math.PI*2);c.fill();
     },
     bodyExtra: function(c, ox, oy, tw, ny, hy2, sw, sc) {
       // 听诊器（简化）
       c.strokeStyle='#2c3e50';c.lineWidth=2.5;
       c.beginPath();c.moveTo(-sw*0.6,ny+3);c.quadraticCurveTo(-tw*1.1,hy2*0.5,-tw*0.4,hy2+2);c.stroke();
-      // 听诊器头
-      let sG=c.createRadialGradient(-tw*0.42,hy2+3,0,-tw*0.4,hy2+4,sc*0.07);
-      sG.addColorStop(0,'#e74c3c');sG.addColorStop(0.5,'#c0392b');sG.addColorStop(1,'#7b241c');
-      c.fillStyle=sG;c.beginPath();c.arc(-tw*0.4,hy2+4,sc*0.06,0,Math.PI*2);c.fill();
+      // 听诊器头（纯色）
+      c.fillStyle='#c0392b';c.beginPath();c.arc(-tw*0.4,hy2+4,sc*0.06,0,Math.PI*2);c.fill();
       // ID牌
       c.fillStyle='rgba(255,255,255,0.85)';
       c.beginPath();c.roundRect(-tw-4,ny+5,sc*0.2,sc*0.28,2);c.fill();
       c.fillStyle='rgba(52,152,219,0.6)';
       c.fillRect(-tw-3,ny+6,sc*0.18,sc*0.06);
-      c.strokeStyle='rgba(52,152,219,0.3)';c.lineWidth=0.5;
-      c.beginPath();c.roundRect(-tw-4,ny+5,sc*0.2,sc*0.28,2);c.stroke();
-      // 领带
-      let tG=c.createLinearGradient(0,ny,0,ny+sc*0.25);
-      tG.addColorStop(0,'#3498db');tG.addColorStop(1,'#1a5276');
-      c.fillStyle=tG;
+      // 领带（纯色）
+      c.fillStyle='#2980b9';
       c.beginPath();c.moveTo(-3,ny+3);c.lineTo(3,ny+3);c.lineTo(2,ny+sc*0.25);c.lineTo(-2,ny+sc*0.25);c.closePath();c.fill();
     }
   });
@@ -1469,28 +1407,14 @@ function render(){
   // screen shake
   ctx.save();
   if(G.screenShake>0){ctx.translate(rand(-G.screenShake,G.screenShake),rand(-G.screenShake,G.screenShake))}
-  // background - 3D地板效果
+  // background - 纯色背景
   let lv=G.levelData;
-  // 深色渐变背景
-  let bgGrad=ctx.createRadialGradient(canvas.width/2,canvas.height/2,0,canvas.width/2,canvas.height/2,Math.max(canvas.width,canvas.height)*0.8);
-  let bgC1=lv.bgColor,bgC2=darkenColor(lv.bgColor.length===7?lv.bgColor:'#f0f0e8',25)||'#c8c8b8';
-  bgGrad.addColorStop(0,bgC1);
-  bgGrad.addColorStop(0.6,bgC2||bgC1);
-  bgGrad.addColorStop(1,darkenColor(bgC2||bgC1,20)||bgC1);
-  ctx.fillStyle=bgGrad;ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = lv.bgColor;ctx.fillRect(0,0,canvas.width,canvas.height);
   // 主网格（瓷砖感）
   let gs=80,sx=-(cx%gs),sy=-(cy%gs);
   ctx.strokeStyle=lv.gridColor;ctx.lineWidth=0.7;
   for(let x=sx;x<canvas.width;x+=gs){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,canvas.height);ctx.stroke()}
   for(let y=sy;y<canvas.height;y+=gs){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke()}
-  // 瓷砖高光（每隔一块绘制高光角）
-  let gs2=gs*2,sx2=-(cx%gs2),sy2=-(cy%gs2);
-  ctx.fillStyle='rgba(255,255,255,0.04)';
-  for(let tx=sx2;tx<canvas.width;tx+=gs2){
-    for(let ty=sy2;ty<canvas.height;ty+=gs2){
-      ctx.fillRect(tx,ty,gs,gs);
-    }
-  }
   // 大格子（区域感）
   let gs3=gs*5,sx3=-(cx%gs3),sy3=-(cy%gs3);
   ctx.strokeStyle='rgba(0,0,0,0.06)';ctx.lineWidth=1.5;
@@ -1661,24 +1585,22 @@ function render(){
     ctx.strokeStyle='rgba(255,68,68,0.5)';ctx.lineWidth=2;ctx.setLineDash([4,4]);
     ctx.beginPath();ctx.arc(ppx,ppy,p.size+8,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
   }
-  // joystick - 3D质感
+  // joystick（纯色简化）
   if(touch.active){
     // 底座
-    let jbG=ctx.createRadialGradient(touch.sx,touch.sy,0,touch.sx,touch.sy,50);
-    jbG.addColorStop(0,'rgba(255,255,255,0.12)');jbG.addColorStop(1,'rgba(255,255,255,0.02)');
-    ctx.fillStyle=jbG;ctx.beginPath();ctx.arc(touch.sx,touch.sy,50,0,Math.PI*2);ctx.fill();
-    ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=2;
+    ctx.fillStyle='rgba(255,255,255,0.06)';ctx.beginPath();ctx.arc(touch.sx,touch.sy,50,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.2)';ctx.lineWidth=2;
     ctx.beginPath();ctx.arc(touch.sx,touch.sy,50,0,Math.PI*2);ctx.stroke();
     // 圆心十字
-    ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(255,255,255,0.12)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(touch.sx-20,touch.sy);ctx.lineTo(touch.sx+20,touch.sy);ctx.stroke();
     ctx.beginPath();ctx.moveTo(touch.sx,touch.sy-20);ctx.lineTo(touch.sx,touch.sy+20);ctx.stroke();
-    // 3D摇杆球
+    // 摇杆球（纯色）
     let jx=touch.sx+touch.dx*50, jy=touch.sy+touch.dy*50;
-    draw3DSphere(ctx,jx,jy,22,'#3498db',{
-      gradStops:[[0,'#74b9ff'],[0.4,'#3498db'],[0.8,'#1a5276'],[1,'#0a2030']],
-      glowColor:'rgba(52,152,219,0.5)',glowBlur:8,noShadow:true
-    });
+    c.fillStyle='#3498db';
+    c.beginPath();c.arc(jx,jy,22,0,Math.PI*2);c.fill();
+    c.fillStyle='rgba(255,255,255,0.25)';
+    c.beginPath();c.arc(jx-4,jy-4,8,0,Math.PI*2);c.fill();
   }
   ctx.restore();
   // minimap
@@ -1757,11 +1679,8 @@ function drawFloorObj(x,y,seed){
 
 function drawMinimap(){
   let ms=120,mScale=ms/G.mapSize;
-  // 3D玻璃背景
-  let mmBG=mmCtx.createRadialGradient(ms/2,ms/2,0,ms/2,ms/2,ms*0.8);
-  mmBG.addColorStop(0,'rgba(10,10,30,0.85)');
-  mmBG.addColorStop(1,'rgba(0,0,5,0.92)');
-  mmCtx.fillStyle=mmBG;mmCtx.fillRect(0,0,ms,ms);
+  // 背景（纯色）
+  mmCtx.fillStyle='rgba(10,10,30,0.9)';mmCtx.fillRect(0,0,ms,ms);
   // 网格
   mmCtx.strokeStyle='rgba(255,255,255,0.04)';mmCtx.lineWidth=0.5;
   for(let i=10;i<ms;i+=10){
@@ -1799,12 +1718,8 @@ function drawMinimap(){
   mmCtx.setLineDash([3,3]);
   mmCtx.strokeRect(G.camera.x*mScale,G.camera.y*mScale,canvas.width*mScale,canvas.height*mScale);
   mmCtx.setLineDash([]);
-  // 外边框（3D斜切感）
-  let mmEdge=mmCtx.createLinearGradient(0,0,ms,ms);
-  mmEdge.addColorStop(0,'rgba(255,255,255,0.3)');
-  mmEdge.addColorStop(0.5,'rgba(255,255,255,0.1)');
-  mmEdge.addColorStop(1,'rgba(255,255,255,0.05)');
-  mmCtx.strokeStyle=mmEdge;mmCtx.lineWidth=2;mmCtx.strokeRect(0,0,ms,ms);
+  // 外边框（纯色）
+  mmCtx.strokeStyle='rgba(255,255,255,0.15)';mmCtx.lineWidth=2;mmCtx.strokeRect(0,0,ms,ms);
 }
 </script>
 </body>
